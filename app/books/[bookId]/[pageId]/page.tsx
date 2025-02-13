@@ -6,8 +6,32 @@ import { books } from "@/lib/books";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation"; // ✅ useParams() 사용
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faHome, faChevronLeft, faChevronRight } from "@fortawesome/free-solid-svg-icons";
+import { faHome } from "@fortawesome/free-solid-svg-icons";
 import { useRouter } from 'next/navigation';
+import { Book, Page } from '@/lib/types';
+import Alert from '../../../components/Alert';
+import ProgressBar from '../../../components/ProgressBar';
+import ReturnHome from "@/components/ReturnHome";
+
+const renderContent = (content: string[] | string) => {
+  if (Array.isArray(content)) {
+    // Render first item (title) without bullet
+    const [title, ...items] = content;
+    return (
+      <div>
+        <p className="whitespace-pre-line text-gray-600 font-semibold mb-4">{title}</p>
+        <ul className="list-disc pl-5 space-y-2">
+          {items.map((line, index) => (
+            <li key={index} className="whitespace-pre-line text-gray-600">
+              {line}
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
+  return <p className="whitespace-pre-line text-gray-600">{content}</p>;
+};
 
 export default function BookPage() {
   const router = useRouter();
@@ -22,6 +46,7 @@ export default function BookPage() {
   const [isAlertVisible, setIsAlertVisible] = useState(false);
   const [isBarTouching, setIsBarTouching] = useState(false);
   const [previewPage, setPreviewPage] = useState<number | null>(null);
+  const textAreaBottomPadding: number = 16;
 
   const showAlert = (message: string) => {
     setAlert(message);
@@ -70,7 +95,7 @@ export default function BookPage() {
       if (pageId >= book.pages.length) {
         showAlert("This is the last page!");
       } else {
-        router.push(`/books/${bookId}/${isDualPage && nextPage ? pageId + 2 : pageId + 1}`);
+        router.push(`/books/${bookId}/${isDualPage && pageId + 1 < book.pages.length ? pageId + 2 : pageId + 1}`);
       }
     }
     
@@ -100,7 +125,18 @@ export default function BookPage() {
     const percentage = Math.min(Math.max(x / rect.width, 0), 1);
     const targetPage = Math.max(1, Math.min(Math.ceil(percentage * book.pages.length), book.pages.length));
     
-    // Only update preview if the target page is different
+    // Check boundary conditions
+    if (pageId === 1 && targetPage < pageId) {
+      showAlert("This is the first page!");
+      return;
+    }
+    
+    if (pageId === book.pages.length && targetPage > pageId) {
+      showAlert("This is the last page!");
+      return;
+    }
+    
+    // Only update preview if the target page is different and within bounds
     if (targetPage !== pageId) {
       setPreviewPage(targetPage);
     }
@@ -122,9 +158,10 @@ export default function BookPage() {
 
   const nextPage = book.pages.find((p) => p.id === pageId + 1);
 
-  const currentPageToShow = previewPage ? book.pages.find(p => p.id === previewPage) : currentPage;
-  const nextPageToShow = previewPage ? book.pages.find(p => p.id === previewPage + 1) : nextPage;
-  const prevPageToShow = previewPage && previewPage > 1 ? book.pages.find(p => p.id === previewPage - 1) : undefined;
+  const mainCurrentPage = currentPage;
+  const mainNextPage = nextPage;
+  const previewCurrentPage = previewPage ? book.pages.find(p => p.id === previewPage) : null;
+  const previewNextPage = previewPage ? book.pages.find(p => p.id === previewPage + 1) : null;
 
   // Add page transition classes
   const pageTransitionClass = previewPage 
@@ -133,20 +170,26 @@ export default function BookPage() {
       : "transition-transform duration-300 -translate-x-0"
     : "";
 
+  // Calculate max content height from all pages
+  const maxContentHeight = Math.max(
+    ...book.pages.map(page => {
+      const englishLines = Array.isArray(page.english) ? page.english.length : page.english.split('\n').length;
+      const koreanLines = page.korean ? page.korean.split('\n').length : 0;
+      return englishLines + koreanLines;
+    })
+  ) * 24; // Approximate line height
+
+  // Add min-height to content containers based on max content
+  const contentStyle = {
+    minHeight: '720px',
+    height: '720px'
+  };
+
   return (
-    <div className="p-8 relative">
-      {alert && (
-        <div className={`fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 
-          bg-black bg-opacity-75 text-white px-4 py-2 rounded-lg z-50
-          transition-opacity duration-500 ease-in-out ${isAlertVisible ? 'opacity-100' : 'opacity-0'}`}>
-          {alert}
-        </div>
-      )}
+    <div className={`p-4 relative`}>
+      <Alert message={alert} isVisible={isAlertVisible} />
       <div className="mb-4">
-        <Link href="/" className="flex items-center gap-2">
-          <FontAwesomeIcon icon={faHome} />
-          Home
-        </Link>
+        <ReturnHome />
       </div>
 
       {/* Content area for swipe gestures */}
@@ -156,72 +199,70 @@ export default function BookPage() {
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
-        {isDualPage && nextPageToShow ? (
+        {isDualPage && mainNextPage ? (
           <div className="flex gap-8 mt-4 relative mb-16">
-            {pageId > 1 && (
-              <Link href={`/books/${bookId}/${isDualPage && pageId > 2 ? pageId - 2 : pageId - 1}`} className="absolute left-0 top-1/2 transform -translate-y-1/2 z-50 flex items-center gap-2">
-                <FontAwesomeIcon icon={faChevronLeft} />
-              </Link>
-            )}
-            <div className={`w-1/2 p-4 border rounded bg-gray-100 ml-16 ${pageTransitionClass}`}>
-              <h2 className="text-xl font-semibold">Page {currentPageToShow.id}</h2>
-              <p className="whitespace-pre-line text-gray-600">{currentPageToShow.english}</p>
-              <div className="border-t border-dotted border-gray-400 my-4"></div>
-              <p className="mt-4 text-gray-600 whitespace-pre-line">{currentPageToShow.korean}</p>
+            <div className={`w-1/2 p-4 border rounded bg-gray-100 ml-16 ${pageTransitionClass} relative overflow-y-auto`} style={contentStyle}>
+              <div className={`${mainCurrentPage.korean ? '' : 'mb-8'}`}>
+                {renderContent(mainCurrentPage.english)}
+                {mainCurrentPage.korean && (
+                  <>
+                    <div className="border-t border-dotted border-gray-400 my-4"></div>
+                    <p className="text-gray-600 whitespace-pre-line mb-8">{mainCurrentPage.korean}</p>
+                  </>
+                )}
+              </div>
+              <div className="absolute bottom-4 right-4 text-gray-400" style={{ right: '4px' }}>
+                {mainCurrentPage.id}
+              </div>
             </div>
-            <div className={`w-1/2 p-4 border rounded bg-gray-100 mr-16 ${pageTransitionClass}`}>
-              <h2 className="text-xl font-semibold">Page {nextPageToShow.id}</h2>
-              <p className="whitespace-pre-line text-gray-600">{nextPageToShow.english}</p>
-              <div className="border-t border-dotted border-gray-400 my-4"></div>
-              <p className="mt-4 text-gray-600 whitespace-pre-line">{nextPageToShow.korean}</p>
+            <div className={`w-1/2 p-4 border rounded bg-gray-100 mr-16 ${pageTransitionClass} relative overflow-y-auto`} style={contentStyle}>
+              <div className={`${mainNextPage.korean ? '' : 'mb-8'}`}>
+                {renderContent(mainNextPage.english)}
+                {mainNextPage.korean && (
+                  <>
+                    <div className="border-t border-dotted border-gray-400 my-4"></div>
+                    <p className="text-gray-600 whitespace-pre-line mb-8">{mainNextPage.korean}</p>
+                  </>
+                )}
+              </div>
+              <div className="absolute bottom-4 right-4 text-gray-400" style={{ right: '4px' }}>
+                {mainNextPage.id}
+              </div>
             </div>
-            {pageId < book.pages.length && (
-              <Link href={`/books/${bookId}/${isDualPage && nextPage ? pageId + 2 : pageId + 1}`} className="absolute right-0 top-1/2 transform -translate-y-1/2 z-50 flex items-center gap-2">
-                <FontAwesomeIcon icon={faChevronRight} />
-              </Link>
-            )}
           </div>
         ) : (
           <div className="w-full">
-            <div className="mt-4 p-4 relative mb-16">
-              {pageId > 1 && (
-                <Link href={`/books/${bookId}/${isDualPage && pageId > 2 ? pageId - 2 : pageId - 1}`} className="absolute left-0 top-1/2 transform -translate-y-1/2 z-50 flex items-center gap-2">
-                  <FontAwesomeIcon icon={faChevronLeft} />
-                </Link>
-              )}
-              <div className={`mx-8 bg-gray-100 p-4 border rounded ${pageTransitionClass}`}>
-                <h2 className="text-xl font-semibold">Page {currentPageToShow.id}</h2>
-                <p className="whitespace-pre-line text-gray-600">{currentPageToShow.english}</p>
-                <div className="border-t border-dotted border-gray-400 my-4"></div>
-                <p className="mt-4 text-gray-600 whitespace-pre-line">{currentPageToShow.korean}</p>
+            <div className={`p-4 relative mb-16`}>
+              <div className={`w-full p-4 pb-[${textAreaBottomPadding}px] border rounded bg-gray-100 ${pageTransitionClass} relative overflow-y-auto`} style={contentStyle}>
+                <div className={`${mainCurrentPage.korean ? '' : 'mb-8'}`}>
+                  {renderContent(mainCurrentPage.english)}
+                  {mainCurrentPage.korean && (
+                    <>
+                      <div className="border-t border-dotted border-gray-400 my-4"></div>
+                      <p className="text-gray-600 whitespace-pre-line mb-8">{mainCurrentPage.korean}</p>
+                    </>
+                  )}
+                </div>
+                <div className="absolute bottom-4 right-4 text-gray-400">
+                  {mainCurrentPage.id}
+                </div>
               </div>
-              {pageId < book.pages.length && (
-                <Link href={`/books/${bookId}/${isDualPage && nextPage ? pageId + 2 : pageId + 1}`} className="absolute right-0 top-1/2 transform -translate-y-1/2 z-50 flex items-center gap-2">
-                  <FontAwesomeIcon icon={faChevronRight} />
-                </Link>
-              )}
             </div>
           </div>
         )}
       </div>
 
-      {/* Progress bar area for drag gestures */}
-      <div className="fixed bottom-8 left-0 w-full px-16">
-        <div className="h-2 bg-gray-200 cursor-pointer rounded-full"
-             onTouchStart={handleBarTouchStart}
-             onTouchMove={handleBarTouchMove}
-             onTouchEnd={handleBarTouchEnd}>
-          <div 
-            className="relative h-full bg-blue-500 rounded-full transition-all duration-300 ease-in-out"
-            style={{ width: `${(pageId / book.pages.length) * 100}%` }}
-          >
-            <div 
-              className="absolute right-0 top-1/2 transform -translate-y-1/2 w-4 h-4 bg-blue-600 rounded-full shadow-md hover:scale-110 transition-transform cursor-grab active:cursor-grabbing"
-              style={{ marginRight: '-8px' }}
-            />
-          </div>
-        </div>
-      </div>
+      <ProgressBar 
+        progress={(pageId / book.pages.length) * 100}
+        onTouchStart={handleBarTouchStart}
+        onTouchMove={handleBarTouchMove}
+        onTouchEnd={handleBarTouchEnd}
+        previewPage={previewCurrentPage}
+        nextPage={previewNextPage}
+        isDualPage={isDualPage}
+        contentStyle={contentStyle}
+        pageTransitionClass={pageTransitionClass}
+      />
     </div>
   );
 }
