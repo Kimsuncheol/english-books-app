@@ -3,11 +3,12 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 
 interface InfiniteCarouselProps {
+  tema?: string;
   items: { src: string; alt: string, path: string }[];
   interval?: number;
 }
 
-const InfiniteCarousel: React.FC<InfiniteCarouselProps> = ({ items, interval = 3000 }) => {
+const InfiniteCarousel: React.FC<InfiniteCarouselProps> = ({ tema = "", items, interval = 3000 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [touchStartX, setTouchStartX] = useState(0);
   const router = useRouter();
@@ -32,14 +33,18 @@ const InfiniteCarousel: React.FC<InfiniteCarouselProps> = ({ items, interval = 3
 
   return (
     <div className="w-full h-full flex flex-col">
+      {
+        tema && <p className=''>{tema}</p>
+      }
       <div
         className="relative overflow-hidden w-full h-full flex-1"
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
         <div
-          className="flex transition-transform duration-500 ease-in-out h-full"
-          style={{ transform: `translateX(-${currentIndex * 100}%)` }}
+          className="flex transition-transform duration-500 ease-in-out h-full space-x-6"
+          // style={{ transform: `translateX(-100%)` }}
+          style={{ transform: `translateX(-${currentIndex * 50}%)` }}
         >
           {items.map((item, index) => (
             <div 

@@ -8,6 +8,7 @@ import InfiniteCarousel from "./components/InfiniteCarousel";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSearch } from "@fortawesome/free-solid-svg-icons";
 import SearchBar from "./components/SearchBar";
+import ChipView from "./components/ChipView"; // Import ChipView
 
 export default function Home() {
   const [showSearchBar, setShowSearchBar] = useState(false);
@@ -83,6 +84,8 @@ export default function Home() {
             </div>
           </div>
         </div>
+        {/* Add ChipView here */}
+        <ChipView chips={["Fiction", "Mystery", "Thriller", "Sci-Fi"]} />
         <div className="flex justify-center mb-8">
           <div className="w-full h-64">
             <InfiniteCarousel items={carouselItems} />
